@@ -29,11 +29,13 @@ class YouTubeDownloaderGUI:
         # Create main window
         self.root = ctk.CTk()
         self.root.title("YouTube Playlist Downloader")
-        self.root.geometry("700x550")
-        self.root.resizable(False, False)
+        self.root.geometry("900x700")
+        self.root.resizable(True, True)
         
         self.is_downloading = False
         self.output_dir = str(Path.home() / "Downloads" / "YouTube")
+        self.video_frames = {}
+        self.current_video = None
         
         self.setup_ui()
         
@@ -41,61 +43,61 @@ class YouTubeDownloaderGUI:
         """Setup the user interface."""
         # Main container
         main_frame = ctk.CTkFrame(self.root, fg_color="transparent")
-        main_frame.pack(fill="both", expand=True, padx=30, pady=30)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
         # Title
         title = ctk.CTkLabel(
             main_frame,
             text="YouTube Playlist Downloader",
-            font=ctk.CTkFont(size=28, weight="bold")
+            font=ctk.CTkFont(size=24, weight="bold")
         )
-        title.pack(pady=(0, 10))
+        title.pack(pady=(0, 5))
         
         subtitle = ctk.CTkLabel(
             main_frame,
             text="Download playlists in the highest quality",
-            font=ctk.CTkFont(size=14),
+            font=ctk.CTkFont(size=13),
             text_color="gray"
         )
-        subtitle.pack(pady=(0, 30))
+        subtitle.pack(pady=(0, 20))
         
         # URL Input Section
         url_frame = ctk.CTkFrame(main_frame)
-        url_frame.pack(fill="x", pady=(0, 20))
+        url_frame.pack(fill="x", pady=(0, 15))
         
         url_label = ctk.CTkLabel(
             url_frame,
             text="Playlist URL",
-            font=ctk.CTkFont(size=14, weight="bold")
+            font=ctk.CTkFont(size=13, weight="bold")
         )
-        url_label.pack(anchor="w", padx=20, pady=(15, 5))
+        url_label.pack(anchor="w", padx=15, pady=(12, 5))
         
         self.url_entry = ctk.CTkEntry(
             url_frame,
             placeholder_text="https://www.youtube.com/playlist?list=...",
-            height=45,
-            font=ctk.CTkFont(size=13)
+            height=40,
+            font=ctk.CTkFont(size=12)
         )
-        self.url_entry.pack(fill="x", padx=20, pady=(0, 15))
+        self.url_entry.pack(fill="x", padx=15, pady=(0, 12))
         
         # Output Directory Section
         dir_frame = ctk.CTkFrame(main_frame)
-        dir_frame.pack(fill="x", pady=(0, 20))
+        dir_frame.pack(fill="x", pady=(0, 15))
         
         dir_label = ctk.CTkLabel(
             dir_frame,
             text="Download Location",
-            font=ctk.CTkFont(size=14, weight="bold")
+            font=ctk.CTkFont(size=13, weight="bold")
         )
-        dir_label.pack(anchor="w", padx=20, pady=(15, 5))
+        dir_label.pack(anchor="w", padx=15, pady=(12, 5))
         
         dir_select_frame = ctk.CTkFrame(dir_frame, fg_color="transparent")
-        dir_select_frame.pack(fill="x", padx=20, pady=(0, 15))
+        dir_select_frame.pack(fill="x", padx=15, pady=(0, 12))
         
         self.dir_label = ctk.CTkLabel(
             dir_select_frame,
             text=self.output_dir,
-            font=ctk.CTkFont(size=12),
+            font=ctk.CTkFont(size=11),
             anchor="w"
         )
         self.dir_label.pack(side="left", fill="x", expand=True, padx=(0, 10))
@@ -103,54 +105,68 @@ class YouTubeDownloaderGUI:
         browse_btn = ctk.CTkButton(
             dir_select_frame,
             text="Browse",
-            width=100,
+            width=90,
+            height=32,
             command=self.browse_directory
         )
         browse_btn.pack(side="right")
         
         # Progress Section
         progress_frame = ctk.CTkFrame(main_frame)
-        progress_frame.pack(fill="x", pady=(0, 20))
+        progress_frame.pack(fill="x", pady=(0, 15))
         
         self.status_label = ctk.CTkLabel(
             progress_frame,
             text="Ready to download",
-            font=ctk.CTkFont(size=13),
+            font=ctk.CTkFont(size=12),
             anchor="w"
         )
-        self.status_label.pack(anchor="w", padx=20, pady=(15, 10))
+        self.status_label.pack(anchor="w", padx=15, pady=(12, 8))
         
         self.progress_bar = ctk.CTkProgressBar(progress_frame)
-        self.progress_bar.pack(fill="x", padx=20, pady=(0, 15))
+        self.progress_bar.pack(fill="x", padx=15, pady=(0, 12))
         self.progress_bar.set(0)
         
         # Download Button
         self.download_btn = ctk.CTkButton(
             main_frame,
             text="Download Playlist",
-            height=50,
-            font=ctk.CTkFont(size=16, weight="bold"),
+            height=45,
+            font=ctk.CTkFont(size=15, weight="bold"),
             command=self.start_download
         )
-        self.download_btn.pack(fill="x", pady=(0, 10))
+        self.download_btn.pack(fill="x", pady=(0, 15))
         
-        # Log text area
-        log_frame = ctk.CTkFrame(main_frame)
-        log_frame.pack(fill="both", expand=True)
+        # Video List Section
+        list_frame = ctk.CTkFrame(main_frame)
+        list_frame.pack(fill="both", expand=True)
         
-        log_label = ctk.CTkLabel(
-            log_frame,
-            text="Download Log",
-            font=ctk.CTkFont(size=12, weight="bold")
+        list_header = ctk.CTkFrame(list_frame)
+        list_header.pack(fill="x", padx=15, pady=(12, 8))
+        
+        list_label = ctk.CTkLabel(
+            list_header,
+            text="Videos",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            anchor="w"
         )
-        log_label.pack(anchor="w", padx=15, pady=(10, 5))
+        list_label.pack(side="left")
         
-        self.log_text = ctk.CTkTextbox(
-            log_frame,
-            height=100,
-            font=ctk.CTkFont(size=11)
+        self.video_count_label = ctk.CTkLabel(
+            list_header,
+            text="0 videos",
+            font=ctk.CTkFont(size=11),
+            text_color="gray",
+            anchor="e"
         )
-        self.log_text.pack(fill="both", expand=True, padx=15, pady=(0, 15))
+        self.video_count_label.pack(side="right")
+        
+        # Scrollable frame for video list
+        self.video_list_scroll = ctk.CTkScrollableFrame(
+            list_frame,
+            fg_color="transparent"
+        )
+        self.video_list_scroll.pack(fill="both", expand=True, padx=15, pady=(0, 15))
         
     def browse_directory(self):
         """Open directory browser."""
@@ -158,12 +174,6 @@ class YouTubeDownloaderGUI:
         if directory:
             self.output_dir = directory
             self.dir_label.configure(text=directory)
-            self.log_message(f"Output directory changed to: {directory}")
-    
-    def log_message(self, message):
-        """Add message to log."""
-        self.log_text.insert("end", f"{message}\n")
-        self.log_text.see("end")
     
     def update_status(self, message, progress=None):
         """Update status label and progress bar."""
@@ -171,23 +181,100 @@ class YouTubeDownloaderGUI:
         if progress is not None:
             self.progress_bar.set(progress)
     
+    def add_video_to_list(self, video_id, title, index):
+        """Add a video to the list."""
+        video_frame = ctk.CTkFrame(self.video_list_scroll, height=60)
+        video_frame.pack(fill="x", pady=4)
+        video_frame.pack_propagate(False)
+        
+        # Left side - number and title
+        left_frame = ctk.CTkFrame(video_frame, fg_color="transparent")
+        left_frame.pack(side="left", fill="both", expand=True, padx=12, pady=8)
+        
+        number_label = ctk.CTkLabel(
+            left_frame,
+            text=f"{index}.",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            width=30,
+            anchor="w"
+        )
+        number_label.pack(side="left", padx=(0, 8))
+        
+        title_label = ctk.CTkLabel(
+            left_frame,
+            text=title[:80] + "..." if len(title) > 80 else title,
+            font=ctk.CTkFont(size=11),
+            anchor="w"
+        )
+        title_label.pack(side="left", fill="x", expand=True)
+        
+        # Right side - status
+        status_label = ctk.CTkLabel(
+            video_frame,
+            text="⏳ Waiting",
+            font=ctk.CTkFont(size=11),
+            text_color="gray",
+            width=120
+        )
+        status_label.pack(side="right", padx=12)
+        
+        # Progress bar for this video
+        progress_bar = ctk.CTkProgressBar(video_frame, width=100, height=4)
+        progress_bar.pack(side="right", padx=(0, 12))
+        progress_bar.set(0)
+        
+        self.video_frames[video_id] = {
+            'frame': video_frame,
+            'status': status_label,
+            'progress': progress_bar,
+            'title': title
+        }
+    
+    def update_video_status(self, video_id, status, progress=None, color=None):
+        """Update a video's status in the list."""
+        if video_id in self.video_frames:
+            self.video_frames[video_id]['status'].configure(text=status)
+            if color:
+                self.video_frames[video_id]['status'].configure(text_color=color)
+            if progress is not None:
+                self.video_frames[video_id]['progress'].set(progress)
+    
     def progress_hook(self, d):
         """Handle download progress."""
         if d['status'] == 'downloading':
             try:
+                # Get current video info
+                info_dict = d.get('info_dict', {})
+                video_id = info_dict.get('id', '')
+                
+                if video_id and video_id != self.current_video:
+                    if self.current_video and self.current_video in self.video_frames:
+                        self.root.after(0, self.update_video_status, 
+                                      self.current_video, "✓ Downloaded", 1.0, "#00ff00")
+                    self.current_video = video_id
+                
                 percent_str = d.get('_percent_str', '0%').strip()
                 percent = float(percent_str.replace('%', '')) / 100
                 speed = d.get('_speed_str', 'N/A')
-                eta = d.get('_eta_str', 'N/A')
                 
+                # Update main progress
                 self.root.after(0, self.update_status, 
-                              f"Downloading... {percent_str} | Speed: {speed} | ETA: {eta}",
-                              percent)
+                              f"Downloading... {percent_str} | Speed: {speed}",
+                              None)
+                
+                # Update video-specific progress
+                if video_id:
+                    self.root.after(0, self.update_video_status,
+                                  video_id, f"⬇️ {percent_str}", percent, "#3b8ed0")
             except:
                 pass
+                
         elif d['status'] == 'finished':
-            filename = os.path.basename(d.get('filename', 'Unknown'))
-            self.root.after(0, self.log_message, f"✓ Completed: {filename}")
+            info_dict = d.get('info_dict', {})
+            video_id = info_dict.get('id', '')
+            if video_id:
+                self.root.after(0, self.update_video_status,
+                              video_id, "🔄 Processing", 1.0, "#ff9500")
     
     def download_playlist(self):
         """Download the playlist."""
@@ -195,12 +282,17 @@ class YouTubeDownloaderGUI:
         
         if not url:
             self.root.after(0, self.update_status, "Error: Please enter a URL", 0)
-            self.root.after(0, self.log_message, "❌ Error: No URL provided")
             self.is_downloading = False
             self.download_btn.configure(state="normal", text="Download Playlist")
             return
         
         Path(self.output_dir).mkdir(parents=True, exist_ok=True)
+        
+        # Clear previous video list
+        for widget in self.video_list_scroll.winfo_children():
+            widget.destroy()
+        self.video_frames.clear()
+        self.current_video = None
         
         ydl_opts = {
             'format': 'bestvideo+bestaudio/best',
@@ -213,28 +305,40 @@ class YouTubeDownloaderGUI:
         }
         
         try:
-            self.root.after(0, self.log_message, f"Starting download from: {url}")
-            
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                # First, extract playlist info
+                self.root.after(0, self.update_status, "Fetching playlist information...", 0.05)
                 info = ydl.extract_info(url, download=False)
                 
                 if 'entries' in info:
                     playlist_title = info.get('title', 'Unknown')
-                    video_count = len(info['entries'])
+                    entries = [e for e in info['entries'] if e]
+                    video_count = len(entries)
                     
-                    self.root.after(0, self.log_message, 
-                                  f"Playlist: {playlist_title} ({video_count} videos)")
+                    self.root.after(0, self.video_count_label.configure, 
+                                  {"text": f"{video_count} videos"})
                     self.root.after(0, self.update_status, 
-                                  f"Downloading {video_count} videos...", 0.1)
+                                  f"Found {video_count} videos in playlist", 0.1)
+                    
+                    # Add all videos to the list
+                    for idx, entry in enumerate(entries, 1):
+                        video_id = entry.get('id', f'video_{idx}')
+                        title = entry.get('title', 'Unknown Title')
+                        self.root.after(0, self.add_video_to_list, video_id, title, idx)
                 
+                # Now download
+                self.root.after(0, self.update_status, "Starting downloads...", 0.15)
                 ydl.download([url])
+                
+                # Mark last video as complete
+                if self.current_video and self.current_video in self.video_frames:
+                    self.root.after(0, self.update_video_status,
+                                  self.current_video, "✓ Downloaded", 1.0, "#00ff00")
             
-            self.root.after(0, self.update_status, "Download completed!", 1.0)
-            self.root.after(0, self.log_message, "✅ All downloads completed successfully!")
+            self.root.after(0, self.update_status, "All downloads completed!", 1.0)
             
         except Exception as e:
-            self.root.after(0, self.update_status, "Download failed!", 0)
-            self.root.after(0, self.log_message, f"❌ Error: {str(e)}")
+            self.root.after(0, self.update_status, f"Error: {str(e)}", 0)
         
         finally:
             self.is_downloading = False
@@ -248,7 +352,6 @@ class YouTubeDownloaderGUI:
         self.is_downloading = True
         self.download_btn.configure(state="disabled", text="Downloading...")
         self.progress_bar.set(0)
-        self.log_text.delete("1.0", "end")
         
         download_thread = threading.Thread(target=self.download_playlist, daemon=True)
         download_thread.start()
