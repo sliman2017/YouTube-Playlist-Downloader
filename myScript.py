@@ -12,6 +12,19 @@ from pathlib import Path
 from tkinter import filedialog
 import customtkinter as ctk
 
+# Get the directory where the executable is located
+if getattr(sys, 'frozen', False):
+    # Running as compiled executable
+    application_path = os.path.dirname(sys.executable)
+else:
+    # Running as script
+    application_path = os.path.dirname(os.path.abspath(__file__))
+
+# Add ffmpeg to PATH if it exists in the app directory
+ffmpeg_path = os.path.join(application_path, 'ffmpeg.exe')
+if os.path.exists(ffmpeg_path):
+    os.environ["PATH"] = application_path + os.pathsep + os.environ["PATH"]
+
 try:
     import yt_dlp
 except ImportError:
