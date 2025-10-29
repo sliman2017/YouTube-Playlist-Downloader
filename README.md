@@ -6,6 +6,9 @@ This repository contains both the Python source (`myScript.py`) and a built exec
 
 ---
 
+![alt text](https://github.com/sliman2017/YouTube-Playlist-Downloader/blob/main/youtube%20downloader.png?raw=true)
+
+
 ## Features
 
 - Download entire playlists (highest available quality).
@@ -89,13 +92,6 @@ This project was packaged with PyInstaller. Example PyInstaller command that pro
 pyinstaller --onefile --add-binary "ffmpeg.exe;." --name youtube_downloader myScript.py
 ```
 
-Notes on packaging:
-- `--onefile` creates a single EXE that unpacks at runtime (useful for distribution).
-- `--add-binary "ffmpeg.exe;."` copies `ffmpeg.exe` next to the exe at runtime.
-- Check the generated `warn-*.txt` in `build/` if PyInstaller warns about missing modules.
-
----
-
 ## Troubleshooting
 
 - "yt-dlp not found" when running exe: ensure the exe was built correctly. If running from source, run `pip install yt-dlp`.
@@ -115,33 +111,3 @@ Debug tips:
 - Keep changes focused and document any new dependencies.
 
 ---
-
-## License
-
-Add a `LICENSE` file to this repo to declare a license. If you want a permissive license, consider MIT:
-
-```
-MIT License
-Copyright (c) YEAR Your Name
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions: ...
-```
-
-Replace `YEAR` and `Your Name` as appropriate.
-
----
-
-If you want, I can also:
-
-- Add a short `USAGE.md` with screenshots or sample commands.
-- Add a `requirements.txt` and a small `build` script for reproducible packaging.
-- Commit this `README.md` into the repository for you.
-
-Thanks — tell me which extra items you'd like me to add next.
-# YouTube-Playlist-Downloader
-Simple modern GUI app to download YouTube playlists in the highest available quality
