@@ -6,9 +6,13 @@ This repository contains both the Python source (`myScript.py`) and a built exec
 
 ---
 
-![alt text](https://github.com/sliman2017/YouTube-Playlist-Downloader/blob/main/youtube%20downloader.png?raw=true)
+![alt text](https://github.com/sliman2017/YouTube-Playlist-Downloader/blob/improve/enhance_design/screenshots/youtube%20downlaoder%2001.png?raw=true)
 
+---
 
+![alt text](https://github.com/sliman2017/YouTube-Playlist-Downloader/blob/improve/enhance_design/screenshots/youtube%20downlaoder%2002.png?raw=true)
+
+---
 ## Features
 
 - Download entire playlists (highest available quality).
