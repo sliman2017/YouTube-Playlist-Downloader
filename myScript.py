@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-YouTube Playlist Downloader - Modern Futuristic UI
+YouTube Playlist Downloader - Dual View Modern UI
 Downloads YouTube playlists in the highest quality available.
-Requires: pip install yt-dlp customtkinter
+Requires: pip install yt-dlp customtkinter pillow requests
 """
 
 import os
@@ -11,6 +11,8 @@ import threading
 from pathlib import Path
 from tkinter import filedialog
 import customtkinter as ctk
+from urllib.request import urlopen
+from io import BytesIO
 
 # Get the directory where the executable is located
 if getattr(sys, 'frozen', False):
@@ -30,36 +32,22 @@ except ImportError:
     print("Please install it using: pip install yt-dlp")
     sys.exit(1)
 
-
-class ModernButton(ctk.CTkButton):
-    """Custom modern button with hover effects."""
-    def __init__(self, master, **kwargs):
-        super().__init__(master, **kwargs)
-        self.default_color = kwargs.get('fg_color', ("#0EA5E9", "#0284C7"))
-        self.hover_color = kwargs.get('hover_color', ("#06B6D4", "#0891B2"))
-        
-        self.bind("<Enter>", self.on_enter)
-        self.bind("<Leave>", self.on_leave)
-    
-    def on_enter(self, e):
-        self.configure(fg_color=self.hover_color)
-    
-    def on_leave(self, e):
-        self.configure(fg_color=self.default_color)
+try:
+    from PIL import Image, ImageTk
+except ImportError:
+    Image = None
+    ImageTk = None
 
 
 class YouTubeDownloaderGUI:
     def __init__(self):
-        # Set appearance - Dark mode
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
         
-        # Create main window
         self.root = ctk.CTk()
         self.root.title("YouTube Playlist Downloader")
-        self.root.geometry("1000x800")
+        self.root.geometry("500x400")
         
-        # Configure colors - Futuristic palette
         self.colors = {
             'bg_primary': '#0A0E1A',
             'bg_secondary': '#111827',
@@ -74,248 +62,329 @@ class YouTubeDownloaderGUI:
             'error': '#EF4444'
         }
         
-        # Configure root background
         self.root.configure(fg_color=self.colors['bg_primary'])
         
         self.is_downloading = False
         self.output_dir = str(Path.home() / "Downloads" / "YouTube")
         self.video_frames = {}
         self.current_video = None
+        self.download_quality = "highest"
+        self.thumbnail_cache = {}
         
-        self.setup_ui()
+        self.setup_compact_view()
         
-    def setup_ui(self):
-        """Setup the futuristic user interface."""
-        # Main container with padding
-        main_container = ctk.CTkFrame(self.root, fg_color="transparent")
-        main_container.pack(fill="both", expand=True, padx=25, pady=25)
+    def setup_compact_view(self):
+        """Compact input view for starting downloads."""
+        self.compact_frame = ctk.CTkFrame(self.root, fg_color="transparent")
+        self.compact_frame.pack(fill="both", expand=True, padx=30, pady=30)
         
-        # ===== HEADER SECTION =====
-        header_frame = ctk.CTkFrame(
-            main_container,
-            fg_color=self.colors['bg_secondary'],
-            corner_radius=20,
-            height=90
-        )
-        header_frame.pack(fill="x", pady=(0, 20))
-        header_frame.pack_propagate(False)
+        # Logo/Header
+        header = ctk.CTkFrame(self.compact_frame, fg_color=self.colors['bg_secondary'], corner_radius=15)
+        header.pack(fill="x", pady=(0, 25))
         
-        # Icon and Title
-        header_content = ctk.CTkFrame(header_frame, fg_color="transparent")
-        header_content.pack(fill="both", expand=True, padx=30, pady=20)
+        header_content = ctk.CTkFrame(header, fg_color="transparent")
+        header_content.pack(padx=25, pady=20)
         
-        # Icon (using emoji as placeholder)
-        icon_label = ctk.CTkLabel(
+        icon = ctk.CTkLabel(
             header_content,
             text="▶",
-            font=ctk.CTkFont(size=36, weight="bold"),
+            font=ctk.CTkFont(size=42, weight="bold"),
             text_color=self.colors['accent_cyan']
         )
-        icon_label.pack(side="left", padx=(0, 15))
-        
-        # Title container
-        title_container = ctk.CTkFrame(header_content, fg_color="transparent")
-        title_container.pack(side="left", fill="both", expand=True)
+        icon.pack()
         
         title = ctk.CTkLabel(
-            title_container,
+            header_content,
             text="YouTube Playlist Downloader",
-            font=ctk.CTkFont(size=28, weight="bold"),
+            font=ctk.CTkFont(size=22, weight="bold"),
             text_color=self.colors['text_primary']
         )
-        title.pack(anchor="w")
+        title.pack(pady=(10, 0))
         
         subtitle = ctk.CTkLabel(
-            title_container,
-            text="Download entire playlists in the highest quality",
-            font=ctk.CTkFont(size=13),
+            header_content,
+            text="Download entire playlists in highest quality",
+            font=ctk.CTkFont(size=12),
             text_color=self.colors['text_secondary']
         )
-        subtitle.pack(anchor="w")
+        subtitle.pack()
         
-        # ===== URL INPUT SECTION =====
-        url_section = ctk.CTkFrame(
-            main_container,
-            fg_color=self.colors['bg_secondary'],
-            corner_radius=20
-        )
-        url_section.pack(fill="x", pady=(0, 15))
-        
-        url_content = ctk.CTkFrame(url_section, fg_color="transparent")
-        url_content.pack(fill="x", padx=25, pady=20)
+        # URL Input
+        url_frame = ctk.CTkFrame(self.compact_frame, fg_color=self.colors['bg_secondary'], corner_radius=12)
+        url_frame.pack(fill="x", pady=(0, 12))
         
         url_label = ctk.CTkLabel(
-            url_content,
+            url_frame,
             text="📎 Playlist URL",
-            font=ctk.CTkFont(size=14, weight="bold"),
-            text_color=self.colors['text_primary'],
-            anchor="w"
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=self.colors['text_primary']
         )
-        url_label.pack(anchor="w", pady=(0, 10))
+        url_label.pack(anchor="w", padx=20, pady=(15, 8))
         
-        # URL input with paste button
-        url_input_frame = ctk.CTkFrame(url_content, fg_color="transparent")
-        url_input_frame.pack(fill="x")
+        url_input_container = ctk.CTkFrame(url_frame, fg_color="transparent")
+        url_input_container.pack(fill="x", padx=20, pady=(0, 15))
         
         self.url_entry = ctk.CTkEntry(
-            url_input_frame,
-            placeholder_text="https://www.youtube.com/playlist?list=...",
-            height=50,
-            font=ctk.CTkFont(size=13),
+            url_input_container,
+            placeholder_text="Paste YouTube playlist URL here...",
+            height=45,
+            font=ctk.CTkFont(size=12),
             fg_color=self.colors['bg_card'],
             border_color=self.colors['accent_cyan'],
             border_width=2,
-            corner_radius=12
+            corner_radius=10
         )
-        self.url_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        self.url_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
         
         paste_btn = ctk.CTkButton(
-            url_input_frame,
-            text="📋 Paste",
-            width=100,
-            height=50,
-            font=ctk.CTkFont(size=13, weight="bold"),
+            url_input_container,
+            text="📋",
+            width=45,
+            height=45,
+            font=ctk.CTkFont(size=16),
             fg_color=self.colors['accent_cyan'],
             hover_color=self.colors['accent_blue'],
-            corner_radius=12,
+            corner_radius=10,
             command=self.paste_url
         )
         paste_btn.pack(side="right")
         
-        # ===== DOWNLOAD LOCATION SECTION =====
-        location_section = ctk.CTkFrame(
-            main_container,
-            fg_color=self.colors['bg_secondary'],
-            corner_radius=20
-        )
-        location_section.pack(fill="x", pady=(0, 15))
+        # Location Input
+        location_frame = ctk.CTkFrame(self.compact_frame, fg_color=self.colors['bg_secondary'], corner_radius=12)
+        location_frame.pack(fill="x", pady=(0, 12))
         
-        location_content = ctk.CTkFrame(location_section, fg_color="transparent")
-        location_content.pack(fill="x", padx=25, pady=20)
-        
-        location_label = ctk.CTkLabel(
-            location_content,
-            text="📁 Download Location",
-            font=ctk.CTkFont(size=14, weight="bold"),
-            text_color=self.colors['text_primary'],
-            anchor="w"
-        )
-        location_label.pack(anchor="w", pady=(0, 10))
-        
-        location_frame = ctk.CTkFrame(location_content, fg_color="transparent")
-        location_frame.pack(fill="x")
-        
-        self.dir_display = ctk.CTkEntry(
+        loc_label = ctk.CTkLabel(
             location_frame,
-            height=50,
-            font=ctk.CTkFont(size=12),
+            text="📁 Save To",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=self.colors['text_primary']
+        )
+        loc_label.pack(anchor="w", padx=20, pady=(15, 8))
+        
+        loc_input_container = ctk.CTkFrame(location_frame, fg_color="transparent")
+        loc_input_container.pack(fill="x", padx=20, pady=(0, 15))
+        
+        self.dir_entry = ctk.CTkEntry(
+            loc_input_container,
+            height=45,
+            font=ctk.CTkFont(size=11),
             fg_color=self.colors['bg_card'],
             border_color=self.colors['accent_purple'],
             border_width=2,
-            corner_radius=12,
-            state="readonly"
+            corner_radius=10
         )
-        self.dir_display.pack(side="left", fill="x", expand=True, padx=(0, 10))
-        self.dir_display.configure(state="normal")
-        self.dir_display.insert(0, self.output_dir)
-        self.dir_display.configure(state="readonly")
+        self.dir_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        self.dir_entry.insert(0, self.output_dir)
         
         browse_btn = ctk.CTkButton(
-            location_frame,
-            text="🔍 Browse",
-            width=120,
-            height=50,
-            font=ctk.CTkFont(size=13, weight="bold"),
+            loc_input_container,
+            text="🔍",
+            width=45,
+            height=45,
+            font=ctk.CTkFont(size=16),
             fg_color=self.colors['accent_purple'],
             hover_color="#7C3AED",
-            corner_radius=12,
+            corner_radius=10,
             command=self.browse_directory
         )
         browse_btn.pack(side="right")
         
-        # ===== PROGRESS SECTION =====
-        progress_section = ctk.CTkFrame(
-            main_container,
-            fg_color=self.colors['bg_secondary'],
-            corner_radius=20
+        # Quality selector
+        quality_frame = ctk.CTkFrame(self.compact_frame, fg_color=self.colors['bg_secondary'], corner_radius=12)
+        quality_frame.pack(fill="x", pady=(0, 20))
+        
+        quality_content = ctk.CTkFrame(quality_frame, fg_color="transparent")
+        quality_content.pack(fill="x", padx=20, pady=15)
+        
+        quality_label = ctk.CTkLabel(
+            quality_content,
+            text="⚙️ Quality",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=self.colors['text_primary']
         )
-        progress_section.pack(fill="x", pady=(0, 15))
+        quality_label.pack(side="left")
         
-        progress_content = ctk.CTkFrame(progress_section, fg_color="transparent")
-        progress_content.pack(fill="x", padx=25, pady=20)
+        self.quality_selector = ctk.CTkSegmentedButton(
+            quality_content,
+            values=["Highest", "1080p", "720p", "Audio Only"],
+            command=self.quality_changed,
+            font=ctk.CTkFont(size=11),
+            fg_color=self.colors['bg_card'],
+            selected_color=self.colors['accent_cyan'],
+            selected_hover_color=self.colors['accent_blue']
+        )
+        self.quality_selector.pack(side="right")
+        self.quality_selector.set("Highest")
         
-        # Status and video count
-        status_header = ctk.CTkFrame(progress_content, fg_color="transparent")
-        status_header.pack(fill="x", pady=(0, 10))
+        # Download Button
+        self.download_btn = ctk.CTkButton(
+            self.compact_frame,
+            text="⬇ Start Download",
+            height=55,
+            font=ctk.CTkFont(size=16, weight="bold"),
+            fg_color=self.colors['accent_cyan'],
+            hover_color=self.colors['accent_blue'],
+            corner_radius=12,
+            command=self.start_download
+        )
+        self.download_btn.pack(fill="x")
+    
+    def setup_download_view(self):
+        """Expanded view showing download progress."""
+        # Destroy compact view
+        self.compact_frame.pack_forget()
         
-        self.status_label = ctk.CTkLabel(
-            status_header,
-            text="⚡ Ready to download",
-            font=ctk.CTkFont(size=13, weight="bold"),
+        # Expand window
+        self.root.geometry("1200x800")
+        
+        # Create download view
+        self.download_frame = ctk.CTkFrame(self.root, fg_color="transparent")
+        self.download_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Top control bar
+        control_bar = ctk.CTkFrame(self.download_frame, fg_color=self.colors['bg_secondary'], corner_radius=15, height=80)
+        control_bar.pack(fill="x", pady=(0, 15))
+        control_bar.pack_propagate(False)
+        
+        control_content = ctk.CTkFrame(control_bar, fg_color="transparent")
+        control_content.pack(fill="both", expand=True, padx=25, pady=15)
+        
+        # Left side - Title and stats
+        left_info = ctk.CTkFrame(control_content, fg_color="transparent")
+        left_info.pack(side="left", fill="both", expand=True)
+        
+        self.playlist_title_label = ctk.CTkLabel(
+            left_info,
+            text="Downloading Playlist...",
+            font=ctk.CTkFont(size=16, weight="bold"),
             text_color=self.colors['text_primary'],
             anchor="w"
         )
-        self.status_label.pack(side="left")
+        self.playlist_title_label.pack(anchor="w")
+        
+        stats_container = ctk.CTkFrame(left_info, fg_color="transparent")
+        stats_container.pack(anchor="w", pady=(5, 0))
         
         self.video_count_label = ctk.CTkLabel(
-            status_header,
+            stats_container,
             text="0 videos",
-            font=ctk.CTkFont(size=12),
-            text_color=self.colors['text_secondary'],
-            anchor="e"
+            font=ctk.CTkFont(size=11),
+            text_color=self.colors['text_secondary']
         )
-        self.video_count_label.pack(side="right")
+        self.video_count_label.pack(side="left", padx=(0, 15))
         
-        # Progress bar with gradient effect
+        self.total_size_label = ctk.CTkLabel(
+            stats_container,
+            text="Total: 0 MB",
+            font=ctk.CTkFont(size=11),
+            text_color=self.colors['text_secondary']
+        )
+        self.total_size_label.pack(side="left", padx=(0, 15))
+        
+        self.speed_label = ctk.CTkLabel(
+            stats_container,
+            text="Speed: 0 MB/s",
+            font=ctk.CTkFont(size=11),
+            text_color=self.colors['accent_cyan']
+        )
+        self.speed_label.pack(side="left")
+        
+        # Right side - Actions
+        right_actions = ctk.CTkFrame(control_content, fg_color="transparent")
+        right_actions.pack(side="right")
+        
+        self.pause_btn = ctk.CTkButton(
+            right_actions,
+            text="⏸",
+            width=45,
+            height=45,
+            font=ctk.CTkFont(size=18),
+            fg_color=self.colors['warning'],
+            hover_color="#D97706",
+            corner_radius=10,
+            state="disabled"
+        )
+        self.pause_btn.pack(side="left", padx=(0, 8))
+        
+        self.cancel_btn = ctk.CTkButton(
+            right_actions,
+            text="✕",
+            width=45,
+            height=45,
+            font=ctk.CTkFont(size=18),
+            fg_color=self.colors['error'],
+            hover_color="#DC2626",
+            corner_radius=10,
+            command=self.cancel_download
+        )
+        self.cancel_btn.pack(side="left")
+        
+        # Overall progress
+        progress_section = ctk.CTkFrame(self.download_frame, fg_color=self.colors['bg_secondary'], corner_radius=15)
+        progress_section.pack(fill="x", pady=(0, 15))
+        
+        progress_content = ctk.CTkFrame(progress_section, fg_color="transparent")
+        progress_content.pack(fill="x", padx=25, pady=15)
+        
+        progress_header = ctk.CTkFrame(progress_content, fg_color="transparent")
+        progress_header.pack(fill="x", pady=(0, 8))
+        
+        self.status_label = ctk.CTkLabel(
+            progress_header,
+            text="⚡ Starting download...",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=self.colors['text_primary']
+        )
+        self.status_label.pack(side="left")
+        
+        self.progress_percentage = ctk.CTkLabel(
+            progress_header,
+            text="0%",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=self.colors['accent_cyan']
+        )
+        self.progress_percentage.pack(side="right")
+        
         self.progress_bar = ctk.CTkProgressBar(
             progress_content,
-            height=12,
-            corner_radius=6,
+            height=10,
+            corner_radius=5,
             progress_color=self.colors['accent_cyan'],
             fg_color=self.colors['bg_card']
         )
         self.progress_bar.pack(fill="x")
         self.progress_bar.set(0)
         
-        # ===== DOWNLOAD BUTTON =====
-        self.download_btn = ctk.CTkButton(
-            main_container,
-            text="⬇ Download Playlist",
-            height=60,
-            font=ctk.CTkFont(size=18, weight="bold"),
-            fg_color=(self.colors['accent_cyan'], self.colors['accent_blue']),
-            hover_color=self.colors['accent_blue'],
-            corner_radius=15,
-            command=self.start_download
-        )
-        self.download_btn.pack(fill="x", pady=(0, 20))
-        
-        # ===== VIDEO LIST SECTION =====
-        list_section = ctk.CTkFrame(
-            main_container,
-            fg_color=self.colors['bg_secondary'],
-            corner_radius=20
-        )
+        # Video list
+        list_section = ctk.CTkFrame(self.download_frame, fg_color=self.colors['bg_secondary'], corner_radius=15)
         list_section.pack(fill="both", expand=True)
         
         list_header = ctk.CTkFrame(list_section, fg_color="transparent")
-        list_header.pack(fill="x", padx=25, pady=(20, 10))
+        list_header.pack(fill="x", padx=25, pady=(15, 10))
         
         list_title = ctk.CTkLabel(
             list_header,
             text="🎬 Videos",
-            font=ctk.CTkFont(size=16, weight="bold"),
+            font=ctk.CTkFont(size=14, weight="bold"),
             text_color=self.colors['text_primary']
         )
         list_title.pack(side="left")
         
-        # Scrollable video list
         self.video_list_scroll = ctk.CTkScrollableFrame(
             list_section,
-            fg_color="transparent",
-            corner_radius=0
+            fg_color="transparent"
         )
         self.video_list_scroll.pack(fill="both", expand=True, padx=25, pady=(0, 20))
+    
+    def quality_changed(self, value):
+        """Handle quality selection change."""
+        quality_map = {
+            "Highest": "highest",
+            "1080p": "1080p",
+            "720p": "720p",
+            "Audio Only": "audio"
+        }
+        self.download_quality = quality_map.get(value, "highest")
     
     def paste_url(self):
         """Paste URL from clipboard."""
@@ -331,100 +400,112 @@ class YouTubeDownloaderGUI:
         directory = filedialog.askdirectory(initialdir=self.output_dir)
         if directory:
             self.output_dir = directory
-            self.dir_display.configure(state="normal")
-            self.dir_display.delete(0, "end")
-            self.dir_display.insert(0, directory)
-            self.dir_display.configure(state="readonly")
+            self.dir_entry.delete(0, "end")
+            self.dir_entry.insert(0, directory)
+    
+    def cancel_download(self):
+        """Cancel download and return to compact view."""
+        self.is_downloading = False
+        self.download_frame.pack_forget()
+        self.root.geometry("500x400")
+        self.setup_compact_view()
     
     def update_status(self, message, progress=None):
         """Update status label and progress bar."""
-        self.status_label.configure(text=message)
-        if progress is not None:
+        if hasattr(self, 'status_label'):
+            self.status_label.configure(text=message)
+        if progress is not None and hasattr(self, 'progress_bar'):
             self.progress_bar.set(progress)
+            if hasattr(self, 'progress_percentage'):
+                self.progress_percentage.configure(text=f"{int(progress * 100)}%")
     
-    def add_video_to_list(self, video_id, title, index):
-        """Add a video card to the list."""
-        # Video card with glassmorphism effect
+    def add_video_to_list(self, video_id, title, index, thumbnail_url=None):
+        """Add a video card to the list with thumbnail."""
         video_card = ctk.CTkFrame(
             self.video_list_scroll,
             fg_color=self.colors['bg_card'],
-            corner_radius=15,
-            height=85
+            corner_radius=12,
+            height=110
         )
-        video_card.pack(fill="x", pady=6)
+        video_card.pack(fill="x", pady=5)
         video_card.pack_propagate(False)
         
-        # Add subtle border effect
-        video_card.configure(border_width=1, border_color=("#2D3748", "#374151"))
-        
         card_content = ctk.CTkFrame(video_card, fg_color="transparent")
-        card_content.pack(fill="both", expand=True, padx=20, pady=15)
+        card_content.pack(fill="both", expand=True, padx=15, pady=12)
         
-        # Left side - Index and title
-        left_container = ctk.CTkFrame(card_content, fg_color="transparent")
-        left_container.pack(side="left", fill="both", expand=True)
-        
-        # Index badge
-        index_badge = ctk.CTkLabel(
-            left_container,
-            text=f"{index}",
-            font=ctk.CTkFont(size=14, weight="bold"),
-            text_color=self.colors['accent_cyan'],
-            width=35,
-            height=35,
-            fg_color=("#1E293B", "#0F172A"),
+        # Thumbnail placeholder
+        thumbnail_frame = ctk.CTkFrame(
+            card_content,
+            width=140,
+            height=85,
+            fg_color=self.colors['bg_primary'],
             corner_radius=8
         )
-        index_badge.pack(side="left", padx=(0, 15))
+        thumbnail_frame.pack(side="left", padx=(0, 15))
+        thumbnail_frame.pack_propagate(False)
         
-        # Title and info container
-        title_container = ctk.CTkFrame(left_container, fg_color="transparent")
-        title_container.pack(side="left", fill="both", expand=True)
+        # Index on thumbnail
+        index_label = ctk.CTkLabel(
+            thumbnail_frame,
+            text=str(index),
+            font=ctk.CTkFont(size=24, weight="bold"),
+            text_color=self.colors['accent_cyan']
+        )
+        index_label.place(relx=0.5, rely=0.5, anchor="center")
         
+        # Info container
+        info_container = ctk.CTkFrame(card_content, fg_color="transparent")
+        info_container.pack(side="left", fill="both", expand=True)
+        
+        # Title
         title_label = ctk.CTkLabel(
-            title_container,
-            text=title[:65] + "..." if len(title) > 65 else title,
+            info_container,
+            text=title[:80] + "..." if len(title) > 80 else title,
             font=ctk.CTkFont(size=12, weight="bold"),
             text_color=self.colors['text_primary'],
-            anchor="w"
+            anchor="w",
+            wraplength=600
         )
         title_label.pack(anchor="w")
         
+        # Download info
         download_info_label = ctk.CTkLabel(
-            title_container,
+            info_container,
             text="",
             font=ctk.CTkFont(size=10),
             text_color=self.colors['text_secondary'],
             anchor="w"
         )
-        download_info_label.pack(anchor="w", pady=(2, 0))
+        download_info_label.pack(anchor="w", pady=(3, 0))
         
-        # Right side - Status and progress
-        right_container = ctk.CTkFrame(card_content, fg_color="transparent")
-        right_container.pack(side="right", padx=(10, 0))
-        
-        status_label = ctk.CTkLabel(
-            right_container,
-            text="⏳ Waiting",
-            font=ctk.CTkFont(size=11, weight="bold"),
-            text_color=self.colors['text_secondary'],
-            width=130
-        )
-        status_label.pack(anchor="e")
+        # Progress bar
+        progress_container = ctk.CTkFrame(info_container, fg_color="transparent")
+        progress_container.pack(fill="x", pady=(8, 0))
         
         progress_bar = ctk.CTkProgressBar(
-            right_container,
-            width=130,
+            progress_container,
             height=6,
             corner_radius=3,
             progress_color=self.colors['accent_cyan'],
-            fg_color=("#1E293B", "#0F172A")
+            fg_color=self.colors['bg_primary']
         )
-        progress_bar.pack(anchor="e", pady=(5, 0))
+        progress_bar.pack(side="left", fill="x", expand=True, padx=(0, 10))
         progress_bar.set(0)
+        
+        # Status
+        status_label = ctk.CTkLabel(
+            progress_container,
+            text="⏳ Waiting",
+            font=ctk.CTkFont(size=10, weight="bold"),
+            text_color=self.colors['text_secondary'],
+            width=100
+        )
+        status_label.pack(side="right")
         
         self.video_frames[video_id] = {
             'card': video_card,
+            'thumbnail': thumbnail_frame,
+            'index_label': index_label,
             'status': status_label,
             'progress': progress_bar,
             'download_info': download_info_label,
@@ -439,7 +520,6 @@ class YouTubeDownloaderGUI:
                 self.video_frames[video_id]['status'].configure(text_color=color)
             if progress is not None:
                 self.video_frames[video_id]['progress'].set(progress)
-                # Change progress bar color based on status
                 if progress >= 1.0:
                     self.video_frames[video_id]['progress'].configure(
                         progress_color=self.colors['success']
@@ -457,7 +537,7 @@ class YouTubeDownloaderGUI:
                 if video_id and video_id != self.current_video:
                     if self.current_video and self.current_video in self.video_frames:
                         self.root.after(0, self.update_video_status, 
-                                      self.current_video, "✓ Complete", 1.0, self.colors['success'], "")
+                                      self.current_video, "✓ Done", 1.0, self.colors['success'], "")
                     self.current_video = video_id
                 
                 percent_str = d.get('_percent_str', '0%').strip()
@@ -481,9 +561,8 @@ class YouTubeDownloaderGUI:
                 
                 download_info = f"📥 {downloaded_str} / {total_str} • {speed}"
                 
-                self.root.after(0, self.update_status, 
-                              f"⬇ Downloading... {percent_str} • {speed}",
-                              None)
+                self.root.after(0, self.speed_label.configure, {"text": f"Speed: {speed}"})
+                self.root.after(0, self.update_status, f"⬇ Downloading... {percent_str}", None)
                 
                 if video_id:
                     self.root.after(0, self.update_video_status,
@@ -517,22 +596,24 @@ class YouTubeDownloaderGUI:
         url = self.url_entry.get().strip()
         
         if not url:
-            self.root.after(0, self.update_status, "❌ Error: Please enter a URL", 0)
-            self.is_downloading = False
-            self.download_btn.configure(state="normal", text="⬇ Download Playlist")
             return
         
+        self.output_dir = self.dir_entry.get().strip()
         Path(self.output_dir).mkdir(parents=True, exist_ok=True)
         
-        for widget in self.video_list_scroll.winfo_children():
-            widget.destroy()
-        self.video_frames.clear()
-        self.current_video = None
+        # Build format string based on quality
+        format_str = 'bestvideo+bestaudio/best'
+        if self.download_quality == '1080p':
+            format_str = 'bestvideo[height<=1080]+bestaudio/best[height<=1080]'
+        elif self.download_quality == '720p':
+            format_str = 'bestvideo[height<=720]+bestaudio/best[height<=720]'
+        elif self.download_quality == 'audio':
+            format_str = 'bestaudio/best'
         
         ydl_opts = {
-            'format': 'bestvideo+bestaudio/best',
+            'format': format_str,
             'outtmpl': os.path.join(self.output_dir, '%(playlist_title)s/%(playlist_index)s - %(title)s.%(ext)s'),
-            'merge_output_format': 'mp4',
+            'merge_output_format': 'mp4' if self.download_quality != 'audio' else 'm4a',
             'ignoreerrors': True,
             'quiet': True,
             'no_warnings': True,
@@ -541,29 +622,30 @@ class YouTubeDownloaderGUI:
         
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                self.root.after(0, self.update_status, "🔍 Fetching playlist...", 0.05)
+                self.root.after(0, self.update_status, "🔍 Fetching playlist info...", 0.05)
                 info = ydl.extract_info(url, download=False)
                 
                 if 'entries' in info:
+                    playlist_title = info.get('title', 'Unknown Playlist')
                     entries = [e for e in info['entries'] if e]
                     video_count = len(entries)
                     
-                    self.root.after(0, self.video_count_label.configure, 
-                                  {"text": f"{video_count} videos"})
-                    self.root.after(0, self.update_status, 
-                                  f"✨ Found {video_count} videos", 0.1)
+                    self.root.after(0, self.playlist_title_label.configure, {"text": playlist_title})
+                    self.root.after(0, self.video_count_label.configure, {"text": f"{video_count} videos"})
+                    self.root.after(0, self.update_status, f"✨ Found {video_count} videos", 0.1)
                     
                     for idx, entry in enumerate(entries, 1):
                         video_id = entry.get('id', f'video_{idx}')
                         title = entry.get('title', 'Unknown Title')
-                        self.root.after(0, self.add_video_to_list, video_id, title, idx)
+                        thumbnail = entry.get('thumbnail')
+                        self.root.after(0, self.add_video_to_list, video_id, title, idx, thumbnail)
                 
-                self.root.after(0, self.update_status, "⚡ Downloading...", 0.15)
+                self.root.after(0, self.update_status, "⚡ Starting downloads...", 0.15)
                 ydl.download([url])
                 
                 if self.current_video and self.current_video in self.video_frames:
                     self.root.after(0, self.update_video_status,
-                                  self.current_video, "✓ Complete", 1.0, self.colors['success'], "")
+                                  self.current_video, "✓ Done", 1.0, self.colors['success'], "")
             
             self.root.after(0, self.update_status, "🎉 All downloads completed!", 1.0)
             
@@ -572,16 +654,20 @@ class YouTubeDownloaderGUI:
         
         finally:
             self.is_downloading = False
-            self.download_btn.configure(state="normal", text="⬇ Download Playlist")
     
     def start_download(self):
         """Start download in a separate thread."""
         if self.is_downloading:
             return
         
+        url = self.url_entry.get().strip()
+        if not url:
+            return
+        
         self.is_downloading = True
-        self.download_btn.configure(state="disabled", text="⏳ Downloading...")
-        self.progress_bar.set(0)
+        
+        # Switch to download view
+        self.setup_download_view()
         
         download_thread = threading.Thread(target=self.download_playlist, daemon=True)
         download_thread.start()
