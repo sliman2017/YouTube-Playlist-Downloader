@@ -46,7 +46,7 @@ class YouTubeDownloaderGUI:
         
         self.root = ctk.CTk()
         self.root.title("YouTube Playlist Downloader")
-        self.root.geometry("500x400")
+        self.root.geometry("550x650")
         
         self.colors = {
             'bg_primary': '#0A0E1A',
@@ -70,6 +70,8 @@ class YouTubeDownloaderGUI:
         self.current_video = None
         self.download_quality = "highest"
         self.thumbnail_cache = {}
+        self.total_downloaded = 0
+        self.current_speed = "0 MB/s"
         
         self.setup_compact_view()
         
@@ -407,7 +409,7 @@ class YouTubeDownloaderGUI:
         """Cancel download and return to compact view."""
         self.is_downloading = False
         self.download_frame.pack_forget()
-        self.root.geometry("500x400")
+        self.root.geometry("550x650")
         self.setup_compact_view()
     
     def update_status(self, message, progress=None):
@@ -547,6 +549,10 @@ class YouTubeDownloaderGUI:
                 downloaded_bytes = d.get('downloaded_bytes', 0)
                 total_bytes = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
                 
+                # Update total downloaded size
+                self.total_downloaded = downloaded_bytes
+                self.current_speed = speed
+                
                 def format_bytes(bytes_num):
                     if bytes_num == 0:
                         return "0 B"
@@ -558,16 +564,23 @@ class YouTubeDownloaderGUI:
                 
                 downloaded_str = format_bytes(downloaded_bytes)
                 total_str = format_bytes(total_bytes) if total_bytes > 0 else "?"
+                total_downloaded_str = format_bytes(self.total_downloaded)
                 
                 download_info = f"📥 {downloaded_str} / {total_str} • {speed}"
                 
-                self.root.after(0, self.speed_label.configure, {"text": f"Speed: {speed}"})
+                # Update global stats
+                if hasattr(self, 'speed_label'):
+                    self.root.after(0, self.speed_label.configure, {"text": f"Speed: {speed}"})
+                if hasattr(self, 'total_size_label'):
+                    self.root.after(0, self.total_size_label.configure, 
+                                  {"text": f"Downloaded: {total_downloaded_str}"})
+                
                 self.root.after(0, self.update_status, f"⬇ Downloading... {percent_str}", None)
                 
                 if video_id:
                     self.root.after(0, self.update_video_status,
                                   video_id, f"⬇ {percent_str}", percent, self.colors['accent_cyan'], download_info)
-            except:
+            except Exception as e:
                 pass
                 
         elif d['status'] == 'finished':
