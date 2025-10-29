@@ -23,7 +23,7 @@ else:
 # Add ffmpeg to PATH if it exists in the app directory
 ffmpeg_path = os.path.join(application_path, 'ffmpeg.exe')
 if os.path.exists(ffmpeg_path):
-    os.environ["PATH"] = application_path + os.pathsep + os.environ["PATH"] 
+    os.environ["PATH"] = application_path + os.pathsep + os.environ["PATH"]
 
 try:
     import yt_dlp
@@ -196,7 +196,7 @@ class YouTubeDownloaderGUI:
     
     def add_video_to_list(self, video_id, title, index):
         """Add a video to the list."""
-        video_frame = ctk.CTkFrame(self.video_list_scroll, height=60)
+        video_frame = ctk.CTkFrame(self.video_list_scroll, height=70)
         video_frame.pack(fill="x", pady=4)
         video_frame.pack_propagate(False)
         
@@ -213,37 +213,55 @@ class YouTubeDownloaderGUI:
         )
         number_label.pack(side="left", padx=(0, 8))
         
+        # Title and download info container
+        title_container = ctk.CTkFrame(left_frame, fg_color="transparent")
+        title_container.pack(side="left", fill="both", expand=True)
+        
         title_label = ctk.CTkLabel(
-            left_frame,
-            text=title[:80] + "..." if len(title) > 80 else title,
+            title_container,
+            text=title[:70] + "..." if len(title) > 70 else title,
             font=ctk.CTkFont(size=11),
             anchor="w"
         )
-        title_label.pack(side="left", fill="x", expand=True)
+        title_label.pack(anchor="w")
         
-        # Right side - status
+        # Download info (speed and size)
+        download_info_label = ctk.CTkLabel(
+            title_container,
+            text="",
+            font=ctk.CTkFont(size=9),
+            text_color="gray",
+            anchor="w"
+        )
+        download_info_label.pack(anchor="w")
+        
+        # Right side - status and progress
+        right_frame = ctk.CTkFrame(video_frame, fg_color="transparent")
+        right_frame.pack(side="right", padx=12, pady=8)
+        
         status_label = ctk.CTkLabel(
-            video_frame,
+            right_frame,
             text="⏳ Waiting",
             font=ctk.CTkFont(size=11),
             text_color="gray",
             width=120
         )
-        status_label.pack(side="right", padx=12)
+        status_label.pack(anchor="e")
         
         # Progress bar for this video
-        progress_bar = ctk.CTkProgressBar(video_frame, width=100, height=4)
-        progress_bar.pack(side="right", padx=(0, 12))
+        progress_bar = ctk.CTkProgressBar(right_frame, width=120, height=4)
+        progress_bar.pack(anchor="e", pady=(4, 0))
         progress_bar.set(0)
         
         self.video_frames[video_id] = {
             'frame': video_frame,
             'status': status_label,
             'progress': progress_bar,
+            'download_info': download_info_label,
             'title': title
         }
     
-    def update_video_status(self, video_id, status, progress=None, color=None):
+    def update_video_status(self, video_id, status, progress=None, color=None, download_info=None):
         """Update a video's status in the list."""
         if video_id in self.video_frames:
             self.video_frames[video_id]['status'].configure(text=status)
@@ -251,6 +269,8 @@ class YouTubeDownloaderGUI:
                 self.video_frames[video_id]['status'].configure(text_color=color)
             if progress is not None:
                 self.video_frames[video_id]['progress'].set(progress)
+            if download_info is not None:
+                self.video_frames[video_id]['download_info'].configure(text=download_info)
     
     def progress_hook(self, d):
         """Handle download progress."""
@@ -263,22 +283,42 @@ class YouTubeDownloaderGUI:
                 if video_id and video_id != self.current_video:
                     if self.current_video and self.current_video in self.video_frames:
                         self.root.after(0, self.update_video_status, 
-                                      self.current_video, "✓ Downloaded", 1.0, "#00ff00")
+                                      self.current_video, "✓ Downloaded", 1.0, "#00ff00", "")
                     self.current_video = video_id
                 
                 percent_str = d.get('_percent_str', '0%').strip()
                 percent = float(percent_str.replace('%', '')) / 100
-                speed = d.get('_speed_str', 'N/A')
+                speed = d.get('_speed_str', 'N/A').strip()
+                
+                # Get downloaded size and total size
+                downloaded_bytes = d.get('downloaded_bytes', 0)
+                total_bytes = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
+                
+                # Format sizes
+                def format_bytes(bytes_num):
+                    if bytes_num == 0:
+                        return "0 B"
+                    for unit in ['B', 'KB', 'MB', 'GB']:
+                        if bytes_num < 1024.0:
+                            return f"{bytes_num:.1f} {unit}"
+                        bytes_num /= 1024.0
+                    return f"{bytes_num:.1f} TB"
+                
+                downloaded_str = format_bytes(downloaded_bytes)
+                total_str = format_bytes(total_bytes) if total_bytes > 0 else "Unknown"
+                
+                # Create download info string
+                download_info = f"📥 {downloaded_str} / {total_str} • {speed}"
                 
                 # Update main progress
                 self.root.after(0, self.update_status, 
                               f"Downloading... {percent_str} | Speed: {speed}",
                               None)
                 
-                # Update video-specific progress
+                # Update video-specific progress with size and speed info
                 if video_id:
                     self.root.after(0, self.update_video_status,
-                                  video_id, f"⬇️ {percent_str}", percent, "#3b8ed0")
+                                  video_id, f"⬇️ {percent_str}", percent, "#3b8ed0", download_info)
             except:
                 pass
                 
@@ -286,8 +326,23 @@ class YouTubeDownloaderGUI:
             info_dict = d.get('info_dict', {})
             video_id = info_dict.get('id', '')
             if video_id:
+                # Get final file size
+                file_size = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
+                
+                def format_bytes(bytes_num):
+                    if bytes_num == 0:
+                        return "0 B"
+                    for unit in ['B', 'KB', 'MB', 'GB']:
+                        if bytes_num < 1024.0:
+                            return f"{bytes_num:.1f} {unit}"
+                        bytes_num /= 1024.0
+                    return f"{bytes_num:.1f} TB"
+                
+                size_str = format_bytes(file_size)
+                download_info = f"✓ Downloaded • {size_str}"
+                
                 self.root.after(0, self.update_video_status,
-                              video_id, "🔄 Processing", 1.0, "#ff9500")
+                              video_id, "🔄 Processing", 1.0, "#ff9500", download_info)
     
     def download_playlist(self):
         """Download the playlist."""
@@ -346,7 +401,7 @@ class YouTubeDownloaderGUI:
                 # Mark last video as complete
                 if self.current_video and self.current_video in self.video_frames:
                     self.root.after(0, self.update_video_status,
-                                  self.current_video, "✓ Downloaded", 1.0, "#00ff00")
+                                  self.current_video, "✓ Downloaded", 1.0, "#00ff00", "")
             
             self.root.after(0, self.update_status, "All downloads completed!", 1.0)
             
