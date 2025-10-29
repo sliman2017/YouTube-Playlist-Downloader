@@ -23,7 +23,7 @@ else:
 # Add ffmpeg to PATH if it exists in the app directory
 ffmpeg_path = os.path.join(application_path, 'ffmpeg.exe')
 if os.path.exists(ffmpeg_path):
-    os.environ["PATH"] = application_path + os.pathsep + os.environ["PATH"]
+    os.environ["PATH"] = application_path + os.pathsep + os.environ["PATH"] 
 
 try:
     import yt_dlp
