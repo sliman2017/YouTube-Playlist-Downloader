@@ -6,13 +6,39 @@ This repository contains both the Python source (`myScript.py`) and a built exec
 
 ---
 
+![alt text](https://github.com/sliman2017/YouTube-Playlist-Downloader/blob/improve/enhance_design/screenshots/youtube%20downlaoder%2001.png?raw=true)
+
+---
+
+![alt text](https://github.com/sliman2017/YouTube-Playlist-Downloader/blob/improve/enhance_design/screenshots/youtube%20downlaoder%2002.png?raw=true)
+
+---
+## Features
+
+- Download entire playlists (highest available quality).
+- Per-video status and progress in the GUI list.
+- Choose output directory (Browse button) or use the default folder.
+- Optional `ffmpeg` support for merging and format conversion (place `ffmpeg.exe` next to the script/exe or available on PATH).
+- Works as a Python script or as a compiled standalone executable.
+
+---
+```markdown
+# YouTube Playlist Downloader
+
+Standalone GUI app and script to download YouTube playlists using `yt-dlp` with a modern CustomTkinter GUI.
+
+This repository contains both the Python source (`myScript.py`) and a built executable (created with PyInstaller) so you can run the app from source or as a standalone `.exe` on Windows.
+
+---
+
 ![alt text](https://github.com/sliman2017/YouTube-Playlist-Downloader/blob/main/youtube%20downloader.png?raw=true)
 
 
 ## Features
 
-- Download entire playlists (highest available quality).
-- Per-video status and progress in the GUI list.
+- Download entire playlists (highest available quality) with selectable target quality.
+- Dual-view interface: starts compact, expands to an expanded download dashboard when a download starts.
+- Per-video status, progress and thumbnail in a detailed video list (each video card shows title, thumbnail, individual progress, speed and status).
 - Choose output directory (Browse button) or use the default folder.
 - Optional `ffmpeg` support for merging and format conversion (place `ffmpeg.exe` next to the script/exe or available on PATH).
 - Works as a Python script or as a compiled standalone executable.
@@ -69,6 +95,48 @@ Notes:
 
 ---
 
+## Dual-view UI (redesign overview)
+
+The app now uses a two-view system: a compact input window for quick starts, and an expanded download dashboard that appears while downloads run.
+
+### 1) Compact Input View (start state)
+
+- Window size: ~550×650 px (compact and focused)
+- Controls:
+  - URL input with Paste button
+  - Save Location with Browse button
+  - Quality selector (Highest / 1080p / 720p / Audio Only)
+  - Start Download button
+
+### 2) Expanded Download View (appears when a download starts)
+
+- Window size: ~1200×800 px (detailed dashboard)
+
+Top control bar (live info)
+- Playlist title and summary stats
+- Video count
+- Total size downloaded so far
+- Real-time total speed indicator
+- Pause button (visual placeholder)
+- Cancel button (stops downloads and returns to compact view)
+
+Overall progress area
+- Status message and percentage indicator
+- Gradient progress bar for visual polish
+
+Video list (main area)
+- Each video is shown as a card (larger layout):
+  - Thumbnail area (140×85 px) with video index
+  - Full title (truncated visually up to ~80 chars)
+  - Download info: downloaded size / total • current speed
+  - Individual progress bar (turns green when complete)
+  - Status states: Waiting → Downloading → Merging → Done
+
+UX notes
+- The app starts compact for quick input. When downloads begin the UI expands to show the full dashboard and live statistics. Users may cancel to return to the compact view at any time.
+
+---
+
 ## Run the compiled executable (Windows)
 
 If you already built the executable with PyInstaller, run the generated `.exe` from your `dist/` folder or wherever you placed it. Example (PowerShell):
@@ -105,9 +173,21 @@ Debug tips:
 
 ---
 
+## New features summary
+
+- Quality selection before starting a download (choose Highest, 1080p, 720p, or Audio Only).
+- Cancel download to return to the compact input view.
+- Live aggregated statistics (total speed, total downloaded size, video count).
+- Playlist title display (real playlist name shown in the top bar).
+- Larger video cards with thumbnail placeholders for clearer information.
+
+---
+
 ## Contributing
 
 - If you want to improve the GUI, add features, or fix bugs, open a PR with a short description and test steps.
 - Keep changes focused and document any new dependencies.
 
 ---
+
+``` 
